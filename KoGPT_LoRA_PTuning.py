@@ -108,6 +108,9 @@ peft_config = PromptTuningConfig(
 peft_model = get_peft_model(base_model, peft_config)
 peft_model.to("cuda") 
 
+
+best_val_loss = 99999999999 # some large value 
+
 learning_rate = 3e-5 
 optimizer = torch.optim.Adam(peft_model.parameters(), lr=learning_rate) 
 scaler = torch.cuda.amp.GradScaler() 
@@ -138,12 +141,14 @@ def validation_step(model, batch):
             step_loss = outputs[0] 
     return step_loss.detach() 
 
-NUM_EPOCHS = 5 # we may increase the number of epochs 
+NUM_EPOCHS = 5 
 
 for epoch in tqdm(range(NUM_EPOCHS), position=0, leave=True, desc="Epochs"): 
     peft_model.train() 
     train_loss = 0 
     for batch_idx, batch in enumerate(tqdm(train_loader, desc="Training"), start=1):
+        if batch_idx == 10: 
+            break 
         step_loss = training_step(peft_model, batch, optimizer, scaler)
         train_loss += step_loss 
         if batch_idx % 300 == 0 and batch_idx > 0:
