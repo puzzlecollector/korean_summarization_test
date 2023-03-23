@@ -12,8 +12,13 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 from peft import get_peft_model, PeftModel, TaskType, LoraConfig, PromptTuningConfig, PromptTuningInit
 
 # define tokenizer 
+'''
 tokenizer = AutoTokenizer.from_pretrained(
     'kakaobrain/kogpt', revision='KoGPT6B-ryan1.5b-float16',
+)
+''' 
+tokenizer = AutoTokenizer.from_pretrained(
+    "kakaobrain/kogpt", revision="KoGPT6B-ryan1.5b"
 )
 
 # train/validation split 
@@ -150,7 +155,7 @@ def validation_step(model, batch):
             step_loss = outputs[0] 
     return step_loss.detach() 
 
-NUM_EPOCHS = 5 
+NUM_EPOCHS = 3 
 
 for epoch in tqdm(range(NUM_EPOCHS), position=0, leave=True, desc="Epochs"): 
     peft_model.train() 
