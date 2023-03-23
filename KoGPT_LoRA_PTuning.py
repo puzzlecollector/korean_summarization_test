@@ -138,19 +138,19 @@ def validation_step(model, batch):
             step_loss = outputs[0] 
     return step_loss.detach() 
 
-NUM_EPOCHS = 5 
+NUM_EPOCHS = 5 # we may increase the number of epochs 
 
 for epoch in tqdm(range(NUM_EPOCHS), position=0, leave=True, desc="Epochs"): 
     peft_model.train() 
     train_loss = 0 
-    for batch_idx, batch in enumerate(tqdm(train_loader), start=1):
+    for batch_idx, batch in enumerate(tqdm(train_loader, desc="Training"), start=1):
         step_loss = training_step(peft_model, batch, optimizer, scaler)
         train_loss += step_loss 
         if batch_idx % 300 == 0 and batch_idx > 0:
             print(f"current train loss : {train_loss / (batch_idx+1)}")
     val_loss = 0 
     peft_model.eval() 
-    for batch_idx, batch in enumerate(tqdm(val_loader), start=1): 
+    for batch_idx, batch in enumerate(tqdm(val_loader, desc="Validating"), start=1): 
         step_loss = validation_step(peft_model, batch) 
         val_loss += step_loss 
     
@@ -162,3 +162,4 @@ for epoch in tqdm(range(NUM_EPOCHS), position=0, leave=True, desc="Epochs"):
         print("saving best checkpoint!") 
         best_val_loss = avg_val_loss 
         peft_model.save_pretrained("best_peft_chkpt.pt") 
+        
