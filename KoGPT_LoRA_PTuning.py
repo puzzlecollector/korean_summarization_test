@@ -82,10 +82,19 @@ val_loader = DataLoader(val_set, batch_size=4, shuffle=False, collate_fn=collate
 
 # define base_model  
 print("loading model") 
+'''
 base_model = AutoModelForCausalLM.from_pretrained(
     'kakaobrain/kogpt', revision = 'KoGPT6B-ryan1.5b-float16',
     torch_dtype = torch.float16,
     device_map = 'auto',
+)
+''' 
+
+
+base_model = AutoModelForCausalLM.from_pretrained(
+    "kakaobrain/kogpt", revision="KoGPT6B-ryan1.5b",
+    torch_dtype="auto", 
+    device_map="auto"
 )
 
 
@@ -147,8 +156,6 @@ for epoch in tqdm(range(NUM_EPOCHS), position=0, leave=True, desc="Epochs"):
     peft_model.train() 
     train_loss = 0 
     for batch_idx, batch in enumerate(tqdm(train_loader, desc="Training"), start=1):
-        if batch_idx == 10: 
-            break 
         step_loss = training_step(peft_model, batch, optimizer, scaler)
         train_loss += step_loss 
         if batch_idx % 300 == 0 and batch_idx > 0:
@@ -168,3 +175,6 @@ for epoch in tqdm(range(NUM_EPOCHS), position=0, leave=True, desc="Epochs"):
         best_val_loss = avg_val_loss 
         peft_model.save_pretrained("best_peft_chkpt.pt") 
         
+    
+print("done training!") 
+print(f"best_val_loss : {best_val_loss}")
