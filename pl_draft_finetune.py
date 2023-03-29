@@ -27,98 +27,8 @@ import re
 import datetime 
 from sklearn.model_selection import train_test_split
 import datasets 
+from deepspeed.ops.adam import DeepSpeedCPUAdam
 
-'''
-class SummarizationData(Dataset): 
-    def __init__(self, path): 
-        super().__init__() 
-        self.data = [] 
-        df = pd.read_csv(path) 
-        texts = df["text"].values
-        summaries = df["summary"].values 
-        for i in range(len(texts)): 
-            try: 
-                data = [] 
-                data.append(texts[i]) 
-                data.append(summaries[i]) 
-                self.data.append(data)
-            except:
-                continue 
-    def __getitem__(self, index): 
-        return self.data[index] 
-    def __len__(self): 
-        return len(self.data) 
-
-class custom_collate(object): 
-    def __init__(self):
-        self.tokenizer = AutoTokenizer.from_pretrained("kakaobrain/kogpt", revision="KoGPT6B-ryan1.5b")
-        self.max_length = 1024 
-        self.mask_token_id = -100
-    
-    def left_pad(self, sequence, value, max_len):
-        if len(sequence) <= self.max_length: 
-            return [value]*(self.max_length - len(sequence)) + sequence 
-        else:
-            return sequence[:self.max_length] 
-    
-    def __call__(self, batch): 
-        input_ids, attn_masks, target_ids = [], [], [] 
-
-        length = 0 
-
-        for idx, cur_batch in enumerate(batch): 
-            original, summary = cur_batch 
-            prompt = original + "의 한줄 요약:" 
-            query = self.tokenizer(prompt) 
-            target = self.tokenizer(summary) 
-            query_input_ids = query["input_ids"] 
-            query_attn_masks = query["attention_mask"] 
-            target_input_ids = target["input_ids"] 
-            target_attn_masks = target["attention_mask"] 
-
-            query_input_ids = query_input_ids + target_input_ids + [self.tokenizer.eos_token_id] 
-            query_attn_masks = query_input_ids + target_attn_masks + [1] 
-            target_input_ids = [self.mask_token_id] * len(query_input_ids) + target_input_ids + [self.tokenizer.eos_token_id] 
-
-            length = max(len(query_input_ids), length)
-
-
-        for idx, cur_batch in enumerate(batch): 
-            try: 
-                original, summary = cur_batch 
-                prompt = original + "의 한줄 요약:" 
-                query = self.tokenizer(prompt)  
-                target = self.tokenizer(summary) 
-                
-                query_input_ids = query["input_ids"] 
-                query_attn_masks = query["attention_mask"] 
-                target_input_ids = target["input_ids"]
-                target_attn_masks = target["attention_mask"] 
-                
-                # add speical tokens 
-                query_input_ids = query_input_ids + target_input_ids + [self.tokenizer.eos_token_id] 
-                query_attn_masks = query_input_ids + target_attn_masks + [1] 
-                target_input_ids = [self.mask_token_id] * len(query_input_ids) + target_input_ids + [self.tokenizer.eos_token_id]
-                
-                query_input_ids = self.left_pad(query_input_ids, self.tokenizer.pad_token_id, length) 
-                query_attn_masks = self.left_pad(query_attn_masks, 0, length) 
-                target_input_ids = self.left_pad(target_input_ids, self.mask_token_id, length) 
-                
-                input_ids.append(query_input_ids) 
-                attn_masks.append(query_attn_masks) 
-                target_ids.append(target_input_ids) 
-                
-            except Exception as e:
-                print(e) 
-                print("==="*100) 
-                continue 
-        input_ids = torch.tensor(input_ids, dtype=int) 
-        attn_masks = torch.tensor(attn_masks, dtype=int) 
-        target_ids = torch.tensor(target_ids, dtype=int) 
-        return input_ids, attn_masks, target_ids 
-
-'''
-                
 
 class NeuralSummarizer(pl.LightningModule): 
     def __init__(self, hparams=dict()):
@@ -126,8 +36,10 @@ class NeuralSummarizer(pl.LightningModule):
         self.hparams.update(hparams) 
         self.save_hyperparameters(ignore="hparams") 
         self.metric = nn.CrossEntropyLoss() 
-        self.tokenizer = AutoTokenizer.from_pretrained("kakaobrain/kogpt", revision="KoGPT6B-ryan1.5b-float16")
-        self.gpt = AutoModelForCausalLM.from_pretrained("kakaobrain/kogpt", revision="KoGPT6B-ryan1.5b-float16") 
+        #self.tokenizer = AutoTokenizer.from_pretrained("kakaobrain/kogpt", revision="KoGPT6B-ryan1.5b-float16")
+        #self.gpt = AutoModelForCausalLM.from_pretrained("kakaobrain/kogpt", revision="KoGPT6B-ryan1.5b-float16")  
+        self.tokenizer = AutoTokenizer.from_pretrained("EleutherAI/polyglot-ko-5.8b") 
+        self.gpt = AutoModelForCausalLM.from_pretrained("EleutherAI/polyglot-ko-5.8b")
         
     def forward(self, input_ids, attention_mask, target_ids): 
         net_out = self.gpt(input_ids=input_ids, attention_mask=attention_mask, labels=target_ids) 
@@ -137,10 +49,11 @@ class NeuralSummarizer(pl.LightningModule):
         return net_out[0]  
     
     def configure_optimizers(self): 
-        optimizer = torch.optim.AdamW(self.parameters(), 
-                                      lr=float(self.hparams.lr), 
-                                      weight_decay=float(self.hparams.weight_decay),
-                                      eps=float(self.hparams.adam_epsilon))
+        
+        optimizer = DeepSpeedCPUAdam(self.parameters(), 
+                                     lr=float(self.hparams.lr), 
+                                     weight_decay=float(self.hparams.weight_decay),
+                                     eps=float(self.hparams.adam_epsilon))
         scheduler = get_linear_schedule_with_warmup(
             optimizer, 
             num_warmup_steps=self.hparams.warmup_steps, 
@@ -184,7 +97,8 @@ class NeuralSummarizer(pl.LightningModule):
         summary_tokens = generated[:, prompted_length:] 
 
 
-tokenizer = AutoTokenizer.from_pretrained("kakaobrain/kogpt", revision="KoGPT6B-ryan1.5b-float16")
+# tokenizer = AutoTokenizer.from_pretrained("kakaobrain/kogpt", revision="KoGPT6B-ryan1.5b-float16") 
+tokenizer = AutoTokenizer.from_pretrained("EleutherAI/polyglot-ko-5.8b") 
 
 
 def train_batch_preprocess(batch):
@@ -253,7 +167,7 @@ if __name__ == "__main__":
         batch_size = 1000,
     )
     train_dataloader = DataLoader(
-        train_set, batch_size=1, shuffle=True, num_workers=0,
+        train_set, batch_size=8, shuffle=True, num_workers=0,
         collate_fn=collate_fn,
     ) 
 
@@ -266,7 +180,7 @@ if __name__ == "__main__":
         batch_size = 1000,
     ) 
     valid_dataloader = DataLoader(
-        val_set, batch_size=1, shuffle=False, num_workers=0, 
+        val_set, batch_size=8, shuffle=False, num_workers=0, 
         collate_fn=collate_fn) 
     
     model = NeuralSummarizer(hparams) 
@@ -280,7 +194,7 @@ if __name__ == "__main__":
     device_cnt = torch.cuda.device_count() 
     trainer = pl.Trainer(devices=4, 
                          max_epochs = hparams.epochs, 
-                         strategy = "deepspeed" if device_cnt > 1 else None, 
+                         strategy = "deepspeed_stage_3_offload" if device_cnt > 1 else None, 
                          callbacks = [chkpt_callback], 
                          gradient_clip_val = 1.0, 
                          accumulate_grad_batches = 10, 
