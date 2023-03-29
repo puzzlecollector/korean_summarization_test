@@ -1,7 +1,3 @@
-'''
-tested on A100-80GB x 4 
-using deepspeed stage 3 offload on CPU
-'''
 import numpy as np 
 import pandas as pd 
 import os
@@ -135,33 +131,20 @@ def collate_fn(batch, device='cuda'):
         for row in batch
     ]
     labels = [
-        left_pad(row['input_ids'], -100, length)
+        left_pad(row['labels'], -100, length)
         for row in batch
     ]
     input_ids = torch.tensor(input_ids, dtype=torch.long) 
     attention_mask = torch.tensor(attention_mask, dtype=torch.long) 
     target_ids = torch.tensor(labels, dtype=torch.long) 
-    return input_ids, attention_mask, target_ids 
-    '''
-    return {
-        'input_ids': torch.tensor(input_ids, dtype=torch.long , device=device),
-        'attention_mask': torch.tensor(attention_mask, dtype=torch.long , device=device),
-        'labels': torch.tensor(labels, dtype=torch.long , device=device),
-    }
-    ''' 
-        
+    return input_ids, attnetion_mask, target_ids 
     
 if __name__ == "__main__": 
     parser = argparse.ArgumentParser() 
     parser.add_argument("--setting", "--s", type=str, default="default.yaml", help="Experiment Setting") 
     args = parser.parse_args(args=[]) 
     hparams = addict.Addict(dict(load_hparams_from_yaml(args.setting))) 
-    #train_set = SummarizationData("train_df.csv") 
-    #val_set = SummarizationData("val_df.csv") 
-
-    #collate = custom_collate() 
-    #train_dataloader = DataLoader(train_set, batch_size=1, collate_fn=collate, shuffle=True)
-    #valid_dataloader = DataLoader(val_set, batch_size=1, collate_fn=collate, shuffle=False) 
+    
     train_df = pd.read_csv("train_df.csv")
     train_set = datasets.Dataset.from_pandas(train_df)
     train_set = train_set.map(
@@ -191,7 +174,7 @@ if __name__ == "__main__":
     chkpt_callback = pl.callbacks.ModelCheckpoint(
         monitor = "val_loss", 
         dirpath = "gen_chkpt/", 
-        filename = "epoch_end_checkpoints-{epoch:02}-{val_loss:.8f}",
+        filename = "polyglot_fixed-{epoch:02}-{val_loss:.8f}",
         save_top_k = 3, 
         mode = "min", 
         save_last = True) 
@@ -206,4 +189,4 @@ if __name__ == "__main__":
                          accelerator = "gpu", 
                          precision="bf16") 
     print("start training model!") 
-    trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=valid_dataloader)
+    trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=valid_dataloader) 
