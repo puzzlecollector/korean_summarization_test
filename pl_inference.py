@@ -94,9 +94,11 @@ class NeuralSummarizer(pl.LightningModule):
                                       penalty_alpha = None,
                                       use_cache = True,
                                       temperature=1.0)
-        prompted_length = input_ids.size(-1)
+        prompted_length = input_ids.size(-1) 
         summary_tokens = generated[:, prompted_length:] 
         summary = tokenizer.batch_decode(summary_tokens, skip_special_tokens=True) 
+        print(summary_tokens) 
+        print(summary) 
         return summary 
 
 
@@ -172,7 +174,7 @@ class SummaryTestDataset(Dataset):
 
 test_path = "aiconnect_test.csv" 
 test_set = SummaryTestDataset(test_path, tokenizer)
-test_dataloader = DataLoader(test_set, batch_size=4, num_workers=0, shuffle=False, collate_fn=test_set.collate_fn) 
+test_dataloader = DataLoader(test_set, batch_size=1, num_workers=0, shuffle=False, collate_fn=test_set.collate_fn) 
 
 
 class CustomWriter(BasePredictionWriter): 
@@ -189,7 +191,7 @@ class CustomWriter(BasePredictionWriter):
         torch.save(prediction, self.output_dir / f"batch_idx-{batch_idx}_{idx}.pt") 
 
 
-output_dir = Path("./outputs") 
+output_dir = Path("./outputs2") 
 prediction_callback = CustomWriter(output_dir, write_interval="batch")
 
 device_cnt = 1 # 1 is enough for inference 
