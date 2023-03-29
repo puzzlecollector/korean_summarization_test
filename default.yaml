@@ -1,0 +1,6 @@
+epochs: 2
+batch_size: 1
+weight_decay: 0.0 
+lr: 2e-5
+adam_epsilon: 1e-8 
+warmup_steps: 100
